@@ -77,6 +77,16 @@ export function VoiceRecorder({
         const form = new FormData();
         form.append("audio", file);
         form.append("deviceId", deviceId);
+        // 폰/PC 로컬 날짜 기준으로 "내일"을 계산하도록 전달
+        const local = new Date();
+        const y = local.getFullYear();
+        const m = String(local.getMonth() + 1).padStart(2, "0");
+        const d = String(local.getDate()).padStart(2, "0");
+        form.append("clientDate", `${y}-${m}-${d}`);
+        form.append(
+          "clientTimeZone",
+          Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Seoul",
+        );
 
         try {
           const res = await fetch("/api/voice", { method: "POST", body: form });

@@ -65,13 +65,17 @@ export default function HomePage() {
                   todos: payload.todos as TodoItem[],
                   storage: payload.storage,
                 });
-                const count = (payload.entries as DiaryEntry[]).length;
+                const saved = payload.entries as DiaryEntry[];
+                const count = saved.length;
+                const dates = Array.from(
+                  new Set(saved.map((e) => e.entry_date)),
+                ).join(", ");
                 setMessage(
-                  `${count}개의 기록이 저장됐어요${
-                    payload.storage === "supabase" ? " (클라우드)" : " (이 기기)"
+                  `${count}개의 기록이 저장됐어요 (${dates})${
+                    payload.storage === "supabase" ? " · 클라우드" : " · 이 기기"
                   }`,
                 );
-                const firstDate = (payload.entries as DiaryEntry[])[0]?.entry_date;
+                const firstDate = saved[0]?.entry_date;
                 if (firstDate) {
                   setSelectedDate(new Date(`${firstDate}T12:00:00`));
                 }

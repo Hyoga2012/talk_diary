@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { classifyTranscript, transcribeAudio } from "@/lib/classify";
+import { buildDateAnchors } from "@/lib/dates";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { ClassifiedItem, DiaryEntry, TodoItem } from "@/lib/types";
 
@@ -11,6 +12,8 @@ export async function POST(request: Request) {
     const form = await request.formData();
     const audio = form.get("audio");
     const deviceId = String(form.get("deviceId") || "anonymous");
+    const clientDate = String(form.get("clientDate") || "");
+    const clientTimeZone = String(form.get("clientTimeZone") || "Asia/Seoul");
 
     if (!(audio instanceof File)) {
       return NextResponse.json(
@@ -37,7 +40,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const classified = await classifyTranscript(transcript);
+    const anchors = buildDateAnchors(clientDate || null, clientTimeZone);
+    const classified = await classifyTranscript(transcript, anchors);
     const now = new Date().toISOString();
 
     const entries: DiaryEntry[] = classified.map((item, index) => ({
