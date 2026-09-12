@@ -1,9 +1,18 @@
 -- Talk Diary Supabase schema
--- Run this in Supabase SQL Editor
+-- Safe to re-run (idempotent)
 
--- Entries: classified diary records from voice
-create type entry_category as enum ('schedule', 'thought', 'idea', 'note', 'todo');
+-- Enums
+do $$ begin
+  create type entry_category as enum ('schedule', 'thought', 'idea', 'note', 'todo');
+exception when duplicate_object then null;
+end $$;
 
+do $$ begin
+  create type todo_status as enum ('pending', 'in_progress', 'done');
+exception when duplicate_object then null;
+end $$;
+
+-- Entries
 create table if not exists public.entries (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade,
@@ -21,13 +30,14 @@ create table if not exists public.entries (
   constraint entries_owner check (user_id is not null or device_id is not null)
 );
 
+alter table public.entries
+  add column if not exists images jsonb not null default '[]'::jsonb;
+
 create index if not exists entries_entry_date_idx on public.entries (entry_date desc);
 create index if not exists entries_user_id_idx on public.entries (user_id);
 create index if not exists entries_device_id_idx on public.entries (device_id);
 
--- Todos: auto-extracted or linked from entries
-create type todo_status as enum ('pending', 'in_progress', 'done');
-
+-- Todos
 create table if not exists public.todos (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade,
@@ -70,7 +80,15 @@ create trigger todos_set_updated_at
 alter table public.entries enable row level security;
 alter table public.todos enable row level security;
 
--- Authenticated users: own rows only
+drop policy if exists "entries_select_own" on public.entries;
+drop policy if exists "entries_insert_own" on public.entries;
+drop policy if exists "entries_update_own" on public.entries;
+drop policy if exists "entries_delete_own" on public.entries;
+drop policy if exists "todos_select_own" on public.todos;
+drop policy if exists "todos_insert_own" on public.todos;
+drop policy if exists "todos_update_own" on public.todos;
+drop policy if exists "todos_delete_own" on public.todos;
+
 create policy "entries_select_own" on public.entries
   for select using (auth.uid() = user_id);
 
@@ -95,15 +113,20 @@ create policy "todos_update_own" on public.todos
 create policy "todos_delete_own" on public.todos
   for delete using (auth.uid() = user_id);
 
--- Guest / device_id access via service role in API routes (recommended).
--- If you prefer anon client with device_id, add policies carefully.
-
--- Audio storage bucket (run in Storage or via dashboard)
--- Bucket name: voice-recordings
--- Public: false
+-- Storage buckets
 insert into storage.buckets (id, name, public)
 values ('voice-recordings', 'voice-recordings', false)
 on conflict (id) do nothing;
+
+insert into storage.buckets (id, name, public)
+values ('entry-images', 'entry-images', true)
+on conflict (id) do update set public = excluded.public;
+
+drop policy if exists "voice_upload_own" on storage.objects;
+drop policy if exists "voice_read_own" on storage.objects;
+drop policy if exists "entry_images_public_read" on storage.objects;
+drop policy if exists "entry_images_service_insert" on storage.objects;
+drop policy if exists "entry_images_service_delete" on storage.objects;
 
 create policy "voice_upload_own"
   on storage.objects for insert
@@ -118,11 +141,6 @@ create policy "voice_read_own"
     bucket_id = 'voice-recordings'
     and auth.uid()::text = (storage.foldername(name))[1]
   );
-
--- Entry photos (public read for display)
-insert into storage.buckets (id, name, public)
-values ('entry-images', 'entry-images', true)
-on conflict (id) do nothing;
 
 create policy "entry_images_public_read"
   on storage.objects for select

@@ -1,9 +1,8 @@
 import { createBrowserClient } from "@supabase/ssr";
-import { normalizeSupabaseUrl } from "./url";
 
 export function createClient() {
-  const url = normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL);
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !key) {
     return null;
@@ -14,7 +13,7 @@ export function createClient() {
 
 export function isSupabaseConfigured() {
   return Boolean(
-    normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   );
 }

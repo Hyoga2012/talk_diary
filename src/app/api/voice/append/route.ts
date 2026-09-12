@@ -5,23 +5,17 @@ import { createServiceClient } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-function asBlob(value: FormDataEntryValue | null): Blob | null {
-  if (!value) return null;
-  if (value instanceof Blob) return value;
-  return null;
-}
-
 export async function POST(request: Request) {
   try {
     const form = await request.formData();
-    const audio = asBlob(form.get("audio"));
-    const entryId = String(form.get("entryId") || "").trim();
-    const deviceId = String(form.get("deviceId") || "").trim();
+    const audio = form.get("audio");
+    const entryId = String(form.get("entryId") || "");
+    const deviceId = String(form.get("deviceId") || "");
 
     if (!entryId) {
       return NextResponse.json({ error: "entryId가 필요합니다." }, { status: 400 });
     }
-    if (!audio) {
+    if (!(audio instanceof File)) {
       return NextResponse.json({ error: "음성 파일이 없습니다." }, { status: 400 });
     }
     if (!process.env.OPENAI_API_KEY) {
@@ -31,10 +25,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const file = new File([audio], "append.webm", {
-      type: audio.type || "audio/webm",
-    });
-    const transcript = await transcribeAudio(file);
+    const transcript = await transcribeAudio(audio);
     if (!transcript) {
       return NextResponse.json(
         { error: "음성을 인식하지 못했습니다." },
@@ -60,70 +51,30 @@ export async function POST(request: Request) {
         .maybeSingle();
 
       if (error) {
-        // Entry may be local-only; still return addition for client merge
-        if (/invalid path/i.test(error.message)) {
-          return NextResponse.json(
-            {
-              error:
-                "Supabase URL이 잘못되었습니다. Vercel/로컬 .env의 NEXT_PUBLIC_SUPABASE_URL을 https://프로젝트ID.supabase.co 형태(뒤에 /rest/v1 없이)로 넣어 주세요.",
-            },
-            { status: 500 },
-          );
-        }
-        return NextResponse.json({
-          transcript,
-          addition,
-          storage: "local",
-          warning: error.message,
-        });
+        return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
-      const baseContent = row?.content || "";
-      const content = `${baseContent}${addition}`;
+      const content = `${row?.content || ""}${addition}`;
       const raw_transcript = row?.raw_transcript
         ? `${row.raw_transcript}\n${transcript}`
         : transcript;
 
-      // If row missing (local-only entry), client still applies addition
-      if (row) {
-        let update = supabase
-          .from("entries")
-          .update({ content, raw_transcript })
-          .eq("id", entryId);
-        if (deviceId) update = update.eq("device_id", deviceId);
+      let update = supabase
+        .from("entries")
+        .update({ content, raw_transcript })
+        .eq("id", entryId);
+      if (deviceId) update = update.eq("device_id", deviceId);
 
-        const { error: updateError } = await update;
-        if (updateError) {
-          if (/invalid path/i.test(updateError.message)) {
-            return NextResponse.json(
-              {
-                error:
-                  "Supabase URL이 잘못되었습니다. NEXT_PUBLIC_SUPABASE_URL에서 /rest/v1 을 제거해 주세요.",
-              },
-              { status: 500 },
-            );
-          }
-          return NextResponse.json({
-            transcript,
-            addition,
-            content: `${addition}`,
-            storage: "local",
-            warning: updateError.message,
-          });
-        }
-
-        return NextResponse.json({
-          transcript,
-          addition,
-          content,
-          storage: "supabase",
-        });
+      const { error: updateError } = await update;
+      if (updateError) {
+        return NextResponse.json({ error: updateError.message }, { status: 500 });
       }
 
       return NextResponse.json({
         transcript,
         addition,
-        storage: "local",
+        content,
+        storage: "supabase",
       });
     }
 
