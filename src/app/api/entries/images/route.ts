@@ -4,12 +4,20 @@ import type { EntryImage } from "@/lib/types";
 
 export const runtime = "nodejs";
 
+function asBlob(value: FormDataEntryValue | null): Blob | null {
+  if (!value) return null;
+  if (value instanceof Blob) return value;
+  return null;
+}
+
 export async function POST(request: Request) {
   try {
     const form = await request.formData();
-    const entryId = String(form.get("entryId") || "");
-    const deviceId = String(form.get("deviceId") || "");
-    const image = form.get("image");
+    const entryId = String(form.get("entryId") || "").trim();
+    const deviceId = String(form.get("deviceId") || "guest")
+      .trim()
+      .replace(/[^a-zA-Z0-9_-]/g, "_");
+    const image = asBlob(form.get("image"));
     const dataUrl = String(form.get("dataUrl") || "");
 
     if (!entryId) {
@@ -19,23 +27,23 @@ export async function POST(request: Request) {
     const imageId = crypto.randomUUID();
     const created_at = new Date().toISOString();
     let nextImage: EntryImage | null = null;
+    let uploadWarning: string | null = null;
 
     const supabase = createServiceClient();
 
-    if (supabase && image instanceof File) {
-      const ext = "jpg";
-      const path = `${deviceId || "guest"}/${entryId}/${imageId}.${ext}`;
+    if (supabase && image) {
+      const path = `${deviceId}/${entryId}/${imageId}.jpg`;
       const buffer = Buffer.from(await image.arrayBuffer());
       const { error: uploadError } = await supabase.storage
         .from("entry-images")
         .upload(path, buffer, {
           contentType: "image/jpeg",
-          upsert: false,
+          upsert: true,
         });
 
       if (uploadError) {
-        console.error(uploadError);
-        // fall through to dataUrl if provided
+        console.error("storage upload:", uploadError);
+        uploadWarning = uploadError.message;
       } else {
         const { data } = supabase.storage.from("entry-images").getPublicUrl(path);
         nextImage = {
@@ -47,10 +55,15 @@ export async function POST(request: Request) {
       }
     }
 
+    // Fallback: keep photo in entry JSON (works even if storage fails)
     if (!nextImage) {
       if (!dataUrl.startsWith("data:image/")) {
         return NextResponse.json(
-          { error: "이미지 업로드에 실패했습니다. (로컬 저장용 dataUrl 필요)" },
+          {
+            error:
+              uploadWarning ||
+              "이미지 업로드에 실패했습니다. Supabase URL이 https://xxxx.supabase.co 형태인지 확인하세요.",
+          },
           { status: 400 },
         );
       }
@@ -70,35 +83,40 @@ export async function POST(request: Request) {
         .maybeSingle();
 
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        // still return image for local merge
+        return NextResponse.json({
+          image: nextImage,
+          storage: "local",
+          warning: error.message,
+        });
       }
 
-      const current = Array.isArray(row?.images) ? (row.images as EntryImage[]) : [];
+      const current = Array.isArray(row?.images)
+        ? (row.images as EntryImage[])
+        : [];
       const images = [...current, nextImage];
 
       let update = supabase.from("entries").update({ images }).eq("id", entryId);
-      if (deviceId) update = update.eq("device_id", deviceId);
+      if (deviceId && deviceId !== "guest") {
+        update = update.eq("device_id", deviceId);
+      }
       const { error: updateError } = await update;
       if (updateError) {
-        // column may not exist yet
         console.error(updateError);
-        return NextResponse.json(
-          {
-            error:
-              updateError.message.includes("images")
-                ? "Supabase에 images 컬럼이 없습니다. migration_images.sql을 실행해 주세요."
-                : updateError.message,
-            image: nextImage,
-            storage: "local",
-          },
-          { status: 200 },
-        );
+        return NextResponse.json({
+          image: nextImage,
+          storage: "local",
+          warning: updateError.message.includes("images")
+            ? "images 컬럼이 없습니다. migration_images.sql을 실행해 주세요."
+            : updateError.message,
+        });
       }
 
       return NextResponse.json({
         image: nextImage,
         images,
         storage: "supabase",
+        warning: uploadWarning,
       });
     }
 
