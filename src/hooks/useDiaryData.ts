@@ -1,7 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { DiaryEntry, EntryCategory, TodoItem, TodoStatus } from "@/lib/types";
+import type {
+  DiaryEntry,
+  EntryCategory,
+  EntryImage,
+  TodoItem,
+  TodoStatus,
+} from "@/lib/types";
 import {
   getDeviceId,
   loadLocalEntries,
@@ -29,7 +35,10 @@ export function useDiaryData() {
       const todosJson = await todosRes.json();
 
       if (entriesJson.storage === "supabase" && Array.isArray(entriesJson.entries)) {
-        const remote = entriesJson.entries as DiaryEntry[];
+        const remote = (entriesJson.entries as DiaryEntry[]).map((e) => ({
+          ...e,
+          images: Array.isArray(e.images) ? e.images : [],
+        }));
         const merged = mergeById(remote, localEntries);
         setEntries(merged);
         saveLocalEntries(merged);
@@ -195,6 +204,71 @@ export function useDiaryData() {
     [deviceId],
   );
 
+  const addEntryImage = useCallback(
+    async (entryId: string, image: EntryImage) => {
+      setEntries((prev) => {
+        const next = prev.map((e) =>
+          e.id === entryId
+            ? { ...e, images: [...(e.images ?? []), image] }
+            : e,
+        );
+        saveLocalEntries(next);
+        return next;
+      });
+    },
+    [],
+  );
+
+  const removeEntryImage = useCallback(
+    async (entryId: string, image: EntryImage) => {
+      setEntries((prev) => {
+        const next = prev.map((e) =>
+          e.id === entryId
+            ? {
+                ...e,
+                images: (e.images ?? []).filter((img) => img.id !== image.id),
+              }
+            : e,
+        );
+        saveLocalEntries(next);
+        return next;
+      });
+
+      await fetch("/api/entries/images", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entryId,
+          imageId: image.id,
+          deviceId,
+          path: image.path,
+        }),
+      });
+    },
+    [deviceId],
+  );
+
+  const appendVoiceToEntry = useCallback(
+    async (
+      entryId: string,
+      payload: { transcript: string; addition: string; content?: string },
+    ) => {
+      setEntries((prev) => {
+        const next = prev.map((e) => {
+          if (e.id !== entryId) return e;
+          const content = payload.content ?? `${e.content}${payload.addition}`;
+          const raw_transcript = e.raw_transcript
+            ? `${e.raw_transcript}\n${payload.transcript}`
+            : payload.transcript;
+          return { ...e, content, raw_transcript };
+        });
+        saveLocalEntries(next);
+        return next;
+      });
+    },
+    [],
+  );
+
   return {
     deviceId,
     entries,
@@ -207,6 +281,9 @@ export function useDiaryData() {
     updateEntry,
     deleteEntry,
     deleteTodo,
+    addEntryImage,
+    removeEntryImage,
+    appendVoiceToEntry,
   };
 }
 

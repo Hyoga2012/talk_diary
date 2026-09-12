@@ -15,6 +15,7 @@ create table if not exists public.entries (
   entry_date date not null default (timezone('Asia/Seoul', now()))::date,
   scheduled_at timestamptz,
   audio_path text,
+  images jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint entries_owner check (user_id is not null or device_id is not null)
@@ -117,3 +118,20 @@ create policy "voice_read_own"
     bucket_id = 'voice-recordings'
     and auth.uid()::text = (storage.foldername(name))[1]
   );
+
+-- Entry photos (public read for display)
+insert into storage.buckets (id, name, public)
+values ('entry-images', 'entry-images', true)
+on conflict (id) do nothing;
+
+create policy "entry_images_public_read"
+  on storage.objects for select
+  using (bucket_id = 'entry-images');
+
+create policy "entry_images_service_insert"
+  on storage.objects for insert
+  with check (bucket_id = 'entry-images');
+
+create policy "entry_images_service_delete"
+  on storage.objects for delete
+  using (bucket_id = 'entry-images');

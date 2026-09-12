@@ -2,9 +2,19 @@
 
 import { format, parseISO } from "date-fns";
 import { ko } from "date-fns/locale";
-import { Check, Pencil, Trash2, X } from "lucide-react";
-import { useState } from "react";
-import type { DiaryEntry, EntryCategory } from "@/lib/types";
+import {
+  Check,
+  ImagePlus,
+  Loader2,
+  Mic,
+  Pencil,
+  Square,
+  Trash2,
+  X,
+} from "lucide-react";
+import { useRef, useState } from "react";
+import { compressImageFile } from "@/lib/image";
+import type { DiaryEntry, EntryCategory, EntryImage } from "@/lib/types";
 import { CATEGORY_LABELS } from "@/lib/types";
 
 const categoryTone: Record<EntryCategory, string> = {
@@ -26,12 +36,23 @@ export type EntryUpdate = {
 
 export function EntryCard({
   entry,
+  deviceId,
   onDelete,
   onUpdate,
+  onAddImage,
+  onRemoveImage,
+  onAppendVoice,
 }: {
   entry: DiaryEntry;
+  deviceId?: string;
   onDelete?: (id: string) => void;
   onUpdate?: (id: string, patch: EntryUpdate) => Promise<void> | void;
+  onAddImage?: (id: string, image: EntryImage) => Promise<void> | void;
+  onRemoveImage?: (entryId: string, image: EntryImage) => Promise<void> | void;
+  onAppendVoice?: (
+    entryId: string,
+    payload: { transcript: string; addition: string; content?: string },
+  ) => Promise<void> | void;
 }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(entry.title);
@@ -39,6 +60,16 @@ export function EntryCard({
   const [category, setCategory] = useState<EntryCategory>(entry.category);
   const [entryDate, setEntryDate] = useState(entry.entry_date);
   const [saving, setSaving] = useState(false);
+  const [busy, setBusy] = useState<"photo" | "voice" | null>(null);
+  const [voiceStatus, setVoiceStatus] = useState<"idle" | "recording" | "processing">(
+    "idle",
+  );
+  const [localError, setLocalError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
+  const images = entry.images ?? [];
 
   const startEdit = () => {
     setTitle(entry.title);
@@ -46,6 +77,7 @@ export function EntryCard({
     setCategory(entry.category);
     setEntryDate(entry.entry_date);
     setEditing(true);
+    setLocalError(null);
   };
 
   const cancelEdit = () => {
@@ -74,6 +106,115 @@ export function EntryCard({
     } finally {
       setSaving(false);
     }
+  };
+
+  const handlePickPhoto = async (file: File | null) => {
+    if (!file || !onAddImage || !deviceId) return;
+    setBusy("photo");
+    setLocalError(null);
+    try {
+      const compressed = await compressImageFile(file);
+      const dataUrl = await blobToDataUrl(compressed);
+      const form = new FormData();
+      form.append("entryId", entry.id);
+      form.append("deviceId", deviceId);
+      form.append("image", compressed, "photo.jpg");
+      form.append("dataUrl", dataUrl);
+
+      const res = await fetch("/api/entries/images", {
+        method: "POST",
+        body: form,
+      });
+      const data = await res.json();
+      if (!res.ok && !data.image) {
+        throw new Error(data.error || "사진 첨부 실패");
+      }
+      if (data.error && !data.image) throw new Error(data.error);
+      await onAddImage(entry.id, data.image as EntryImage);
+      if (data.error) setLocalError(data.error);
+    } catch (e) {
+      setLocalError(e instanceof Error ? e.message : "사진 첨부 실패");
+    } finally {
+      setBusy(null);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  const stopAppendVoice = () => {
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+  };
+
+  const startAppendVoice = async () => {
+    if (!onAppendVoice || !deviceId || voiceStatus === "processing") return;
+    setLocalError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/mp4")
+          ? "audio/mp4"
+          : "";
+      const recorder = new MediaRecorder(
+        stream,
+        mimeType ? { mimeType } : undefined,
+      );
+      chunksRef.current = [];
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunksRef.current.push(event.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setVoiceStatus("processing");
+        setBusy("voice");
+        try {
+          const blob = new Blob(chunksRef.current, {
+            type: recorder.mimeType || "audio/webm",
+          });
+          const ext = blob.type.includes("mp4") ? "mp4" : "webm";
+          const file = new File([blob], `append.${ext}`, { type: blob.type });
+          const form = new FormData();
+          form.append("audio", file);
+          form.append("entryId", entry.id);
+          form.append("deviceId", deviceId);
+
+          const res = await fetch("/api/voice/append", {
+            method: "POST",
+            body: form,
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "추가 음성 실패");
+
+          await onAppendVoice(entry.id, {
+            transcript: data.transcript,
+            addition: data.addition,
+            content: data.content,
+          });
+        } catch (e) {
+          setLocalError(e instanceof Error ? e.message : "추가 음성 실패");
+        } finally {
+          setVoiceStatus("idle");
+          setBusy(null);
+        }
+      };
+
+      recorder.start();
+      setVoiceStatus("recording");
+    } catch {
+      setLocalError("마이크 권한이 필요합니다.");
+      setVoiceStatus("idle");
+    }
+  };
+
+  const toggleAppendVoice = () => {
+    if (voiceStatus === "recording") {
+      stopAppendVoice();
+      return;
+    }
+    void startAppendVoice();
   };
 
   return (
@@ -121,6 +262,92 @@ export function EntryCard({
           <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-[var(--body)]">
             {entry.content}
           </p>
+
+          {images.length > 0 && (
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {images.map((img) => (
+                <div key={img.id} className="relative aspect-square overflow-hidden rounded-xl">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={img.url}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                  {onRemoveImage && (
+                    <button
+                      type="button"
+                      aria-label="사진 삭제"
+                      onClick={() => {
+                        if (confirm("이 사진을 삭제할까요?")) {
+                          void onRemoveImage(entry.id, img);
+                        }
+                      }}
+                      className="absolute right-1 top-1 rounded-full bg-black/55 p-1 text-white"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => void handlePickPhoto(e.target.files?.[0] || null)}
+            />
+            {onAddImage && (
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => fileRef.current?.click()}
+                className="inline-flex items-center gap-1.5 rounded-full bg-black/5 px-3 py-1.5 text-[11px] font-semibold text-[var(--ink)] disabled:opacity-50"
+              >
+                {busy === "photo" ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <ImagePlus size={14} />
+                )}
+                사진
+              </button>
+            )}
+            {onAppendVoice && (
+              <button
+                type="button"
+                disabled={busy === "photo" || voiceStatus === "processing"}
+                onClick={toggleAppendVoice}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold disabled:opacity-50 ${
+                  voiceStatus === "recording"
+                    ? "bg-[var(--accent)] text-white"
+                    : "bg-black/5 text-[var(--ink)]"
+                }`}
+              >
+                {voiceStatus === "processing" ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : voiceStatus === "recording" ? (
+                  <Square size={14} className="fill-current" />
+                ) : (
+                  <Mic size={14} />
+                )}
+                {voiceStatus === "recording"
+                  ? "녹음 중지"
+                  : voiceStatus === "processing"
+                    ? "인식 중"
+                    : "추가 말하기"}
+              </button>
+            )}
+          </div>
+          {localError && (
+            <p className="mt-2 text-xs text-[var(--accent)]">{localError}</p>
+          )}
+          <p className="mt-2 text-[11px] text-[var(--muted)]">
+            오타는 연필(수정)로 타이핑해 고칠 수 있습니다.
+          </p>
         </>
       ) : (
         <div className="space-y-3">
@@ -162,7 +389,7 @@ export function EntryCard({
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              rows={4}
+              rows={5}
               className="mt-1 w-full resize-y rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3 py-2 text-sm leading-relaxed text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--accent)]"
             />
           </label>
@@ -206,4 +433,13 @@ export function EntryCard({
       )}
     </article>
   );
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("이미지를 읽지 못했습니다."));
+    reader.readAsDataURL(blob);
+  });
 }

@@ -2,6 +2,13 @@ export type EntryCategory = "schedule" | "thought" | "idea" | "note" | "todo";
 
 export type TodoStatus = "pending" | "in_progress" | "done";
 
+export interface EntryImage {
+  id: string;
+  url: string;
+  path?: string | null;
+  created_at: string;
+}
+
 export interface DiaryEntry {
   id: string;
   category: EntryCategory;
@@ -10,6 +17,7 @@ export interface DiaryEntry {
   raw_transcript?: string | null;
   entry_date: string; // YYYY-MM-DD
   scheduled_at?: string | null;
+  images?: EntryImage[];
   created_at: string;
 }
 

@@ -25,8 +25,9 @@ npm run dev
 
 1. [Supabase](https://supabase.com) 프로젝트 생성
 2. SQL Editor에서 `supabase/schema.sql` 전체 실행
-3. Project Settings → API에서 URL, anon key, service_role key 복사
-4. `.env.local`에 아래 채우기
+3. (기존 프로젝트) 사진 첨부용으로 `supabase/migration_images.sql`도 실행
+4. Project Settings → API에서 URL, anon key, service_role key 복사
+5. `.env.local`에 아래 채우기
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=...

@@ -8,15 +8,21 @@ import { EntryCard } from "@/components/EntryCard";
 import { VoiceRecorder } from "@/components/VoiceRecorder";
 import { useDiaryData } from "@/hooks/useDiaryData";
 import type { DiaryEntry, TodoItem } from "@/lib/types";
+import { TODO_STATUS_LABELS } from "@/lib/types";
 
 export default function HomePage() {
   const {
     deviceId,
     entries,
+    todos,
     ready,
     appendVoiceResult,
     deleteEntry,
     updateEntry,
+    addEntryImage,
+    removeEntryImage,
+    appendVoiceToEntry,
+    updateTodoStatus,
   } = useDiaryData();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [message, setMessage] = useState<string | null>(null);
@@ -25,14 +31,28 @@ export default function HomePage() {
 
   const selectedKey = format(selectedDate, "yyyy-MM-dd");
 
-  const markedDates = useMemo(
-    () => Array.from(new Set(entries.map((e) => e.entry_date))),
-    [entries],
-  );
+  const markedDates = useMemo(() => {
+    const dates = new Set(entries.map((e) => e.entry_date));
+    todos.forEach((t) => {
+      if (t.due_date) dates.add(t.due_date);
+    });
+    return Array.from(dates);
+  }, [entries, todos]);
 
   const dayEntries = useMemo(
     () => entries.filter((e) => e.entry_date === selectedKey),
     [entries, selectedKey],
+  );
+
+  // 완료 포함 — 다이어리 날짜에서는 항상 확인 가능
+  const dayTodos = useMemo(
+    () =>
+      todos.filter(
+        (t) =>
+          t.due_date === selectedKey ||
+          dayEntries.some((e) => e.id === t.entry_id),
+      ),
+    [todos, selectedKey, dayEntries],
   );
 
   return (
@@ -128,8 +148,11 @@ export default function HomePage() {
           <h2 className="font-[family-name:var(--font-display)] text-2xl text-[var(--ink)]">
             {format(selectedDate, "M월 d일 EEEE", { locale: ko })}
           </h2>
-          <span className="text-xs text-[var(--muted)]">{dayEntries.length}개</span>
+          <span className="text-xs text-[var(--muted)]">
+            기록 {dayEntries.length} · 할일 {dayTodos.length}
+          </span>
         </div>
+
         <div className="paper-panel rounded-[1.25rem] px-4">
           {dayEntries.length === 0 ? (
             <p className="py-8 text-center text-sm text-[var(--muted)]">
@@ -140,12 +163,62 @@ export default function HomePage() {
               <EntryCard
                 key={entry.id}
                 entry={entry}
+                deviceId={deviceId}
                 onDelete={deleteEntry}
                 onUpdate={updateEntry}
+                onAddImage={addEntryImage}
+                onRemoveImage={removeEntryImage}
+                onAppendVoice={appendVoiceToEntry}
               />
             ))
           )}
         </div>
+
+        {dayTodos.length > 0 && (
+          <div className="mt-4">
+            <h3 className="mb-2 font-[family-name:var(--font-display)] text-lg text-[var(--ink)]">
+              이날의 할일
+            </h3>
+            <p className="mb-2 text-xs text-[var(--muted)]">
+              완료해도 다이어리 날짜에서는 계속 확인할 수 있습니다.
+            </p>
+            <ul className="space-y-2">
+              {dayTodos.map((todo) => (
+                <li
+                  key={todo.id}
+                  className="paper-panel flex items-start gap-3 rounded-[1.1rem] px-4 py-3"
+                >
+                  <input
+                    type="checkbox"
+                    checked={todo.status === "done"}
+                    onChange={() =>
+                      updateTodoStatus(
+                        todo.id,
+                        todo.status === "done" ? "pending" : "done",
+                      )
+                    }
+                    className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={`text-sm ${
+                        todo.status === "done"
+                          ? "text-[var(--muted)] line-through"
+                          : "text-[var(--ink)]"
+                      }`}
+                    >
+                      {todo.title}
+                    </p>
+                    <p className="mt-1 text-[11px] font-semibold text-[var(--muted)]">
+                      {TODO_STATUS_LABELS[todo.status]}
+                      {todo.due_date ? ` · 마감 ${todo.due_date}` : ""}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
     </div>
   );

@@ -52,6 +52,7 @@ export async function POST(request: Request) {
       raw_transcript: index === 0 ? transcript : null,
       entry_date: item.entry_date,
       scheduled_at: item.scheduled_at ?? null,
+      images: [],
       created_at: now,
     }));
 
