@@ -1,7 +1,7 @@
 "use client";
 
-import { RotateCcw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { TodoCard } from "@/components/TodoCard";
 import { useDiaryData } from "@/hooks/useDiaryData";
 import type { TodoStatus } from "@/lib/types";
 import { TODO_STATUS_LABELS } from "@/lib/types";
@@ -14,7 +14,8 @@ const filters: Array<TodoStatus | "all"> = [
 ];
 
 export default function TodosPage() {
-  const { todos, ready, updateTodoStatus, deleteTodo } = useDiaryData();
+  const { todos, ready, updateTodoStatus, updateTodo, deleteTodo } =
+    useDiaryData();
   const [filter, setFilter] = useState<TodoStatus | "all">("all");
 
   const visible = useMemo(() => {
@@ -30,7 +31,6 @@ export default function TodosPage() {
 
   const changeStatus = async (id: string, status: TodoStatus) => {
     await updateTodoStatus(id, status);
-    // 필터 때문에 항목이 사라져 안 보이는 경우, 바꾼 상태로 따라가기
     if (filter !== "all" && filter !== status) {
       setFilter(status);
     }
@@ -43,10 +43,8 @@ export default function TodosPage() {
           할일
         </h1>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          체크하면 완료됩니다. 다시 점검이 필요하면{" "}
-          <span className="font-semibold text-[var(--ink)]">대기로</span> 또는{" "}
-          <span className="font-semibold text-[var(--ink)]">진행중으로</span> 되돌릴
-          수 있습니다.
+          연필 아이콘으로 오타·마감일을 고치고, 완료 후엔 대기/진행중으로 되돌릴 수
+          있습니다.
         </p>
       </header>
 
@@ -100,104 +98,18 @@ export default function TodosPage() {
       ) : (
         <ul className="space-y-3">
           {visible.map((todo) => (
-            <li
+            <TodoCard
               key={todo.id}
-              className="paper-panel rounded-[1.1rem] px-4 py-4"
-            >
-              <div className="flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  checked={todo.status === "done"}
-                  onChange={() =>
-                    void changeStatus(
-                      todo.id,
-                      todo.status === "done" ? "pending" : "done",
-                    )
-                  }
-                  className="mt-1 h-4 w-4 accent-[var(--accent)]"
-                  title={
-                    todo.status === "done"
-                      ? "체크 해제하면 대기로 돌아갑니다"
-                      : "완료로 표시"
-                  }
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start gap-2">
-                    <p
-                      className={`min-w-0 flex-1 text-sm leading-relaxed ${
-                        todo.status === "done"
-                          ? "text-[var(--muted)] line-through"
-                          : "text-[var(--ink)]"
-                      }`}
-                    >
-                      {todo.title}
-                    </p>
-                    <button
-                      type="button"
-                      aria-label="할일 삭제"
-                      onClick={() => {
-                        if (confirm("이 할일을 삭제할까요?")) {
-                          void deleteTodo(todo.id);
-                        }
-                      }}
-                      className="rounded-full p-1.5 text-[var(--muted)] transition hover:bg-[var(--chip-todo)] hover:text-[var(--accent)]"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {(
-                      ["pending", "in_progress", "done"] as TodoStatus[]
-                    ).map((status) => (
-                      <button
-                        key={status}
-                        type="button"
-                        onClick={() => void changeStatus(todo.id, status)}
-                        className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
-                          todo.status === status
-                            ? "bg-[var(--ink)] text-[var(--paper)]"
-                            : "bg-black/5 text-[var(--muted)] hover:bg-black/10 hover:text-[var(--ink)]"
-                        }`}
-                      >
-                        {TODO_STATUS_LABELS[status]}
-                      </button>
-                    ))}
-                  </div>
-
-                  {todo.status === "done" && (
-                    <div className="mt-3 flex flex-wrap gap-2 rounded-xl bg-[var(--chip-thought)]/80 p-2">
-                      <span className="flex items-center gap-1 px-1 text-[11px] font-semibold text-[var(--muted)]">
-                        <RotateCcw size={12} />
-                        다시 열기
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => void changeStatus(todo.id, "pending")}
-                        className="rounded-full bg-[var(--paper)] px-3 py-1 text-[11px] font-semibold text-[var(--ink)] shadow-sm"
-                      >
-                        대기로
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void changeStatus(todo.id, "in_progress")
-                        }
-                        className="rounded-full bg-[var(--paper)] px-3 py-1 text-[11px] font-semibold text-[var(--ink)] shadow-sm"
-                      >
-                        진행중으로
-                      </button>
-                    </div>
-                  )}
-
-                  {todo.due_date && (
-                    <p className="mt-2 text-xs text-[var(--muted)]">
-                      마감 {todo.due_date}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </li>
+              todo={todo}
+              onDelete={deleteTodo}
+              onUpdate={async (id, patch) => {
+                await updateTodo(id, patch);
+                if (filter !== "all" && filter !== patch.status) {
+                  setFilter(patch.status);
+                }
+              }}
+              onStatusChange={(id, status) => void changeStatus(id, status)}
+            />
           ))}
         </ul>
       )}

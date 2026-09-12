@@ -7,7 +7,7 @@ import { EntryCard } from "@/components/EntryCard";
 import { useDiaryData } from "@/hooks/useDiaryData";
 
 export default function EntriesPage() {
-  const { entries, ready, deleteEntry } = useDiaryData();
+  const { entries, ready, deleteEntry, updateEntry } = useDiaryData();
   const [query, setQuery] = useState("");
 
   const grouped = useMemo(() => {
@@ -38,7 +38,8 @@ export default function EntriesPage() {
           기록
         </h1>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          날짜별로 모인 일정·생각·아이디어를 한눈에 봅니다
+          날짜별로 모인 일정·생각·아이디어를 한눈에 봅니다. 연필 아이콘으로
+          오타·날짜·분류를 수정할 수 있습니다.
         </p>
       </header>
 
@@ -70,6 +71,7 @@ export default function EntriesPage() {
                     key={entry.id}
                     entry={entry}
                     onDelete={deleteEntry}
+                    onUpdate={updateEntry}
                   />
                 ))}
               </div>

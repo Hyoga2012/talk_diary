@@ -16,6 +16,7 @@ export default function HomePage() {
     ready,
     appendVoiceResult,
     deleteEntry,
+    updateEntry,
   } = useDiaryData();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [message, setMessage] = useState<string | null>(null);
@@ -140,6 +141,7 @@ export default function HomePage() {
                 key={entry.id}
                 entry={entry}
                 onDelete={deleteEntry}
+                onUpdate={updateEntry}
               />
             ))
           )}

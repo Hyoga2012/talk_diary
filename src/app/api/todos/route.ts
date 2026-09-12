@@ -27,12 +27,25 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   const body = (await request.json()) as {
     id: string;
-    status: TodoStatus;
     deviceId?: string;
+    status?: TodoStatus;
+    title?: string;
+    due_date?: string | null;
   };
 
-  if (!body.id || !body.status) {
+  if (!body.id) {
     return NextResponse.json({ error: "잘못된 요청" }, { status: 400 });
+  }
+
+  const updates: Record<string, string | null> = {};
+  if (body.status) updates.status = body.status;
+  if (typeof body.title === "string") updates.title = body.title.trim();
+  if (body.due_date !== undefined) {
+    updates.due_date = body.due_date || null;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: "수정할 내용이 없습니다." }, { status: 400 });
   }
 
   const supabase = createServiceClient();
@@ -40,10 +53,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: true, storage: "local" });
   }
 
-  let query = supabase
-    .from("todos")
-    .update({ status: body.status })
-    .eq("id", body.id);
+  let query = supabase.from("todos").update(updates).eq("id", body.id);
 
   if (body.deviceId) {
     query = query.eq("device_id", body.deviceId);

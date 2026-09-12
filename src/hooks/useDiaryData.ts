@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { DiaryEntry, TodoItem } from "@/lib/types";
+import type { DiaryEntry, EntryCategory, TodoItem, TodoStatus } from "@/lib/types";
 import {
   getDeviceId,
   loadLocalEntries,
@@ -80,7 +80,7 @@ export function useDiaryData() {
   );
 
   const updateTodoStatus = useCallback(
-    async (id: string, status: TodoItem["status"]) => {
+    async (id: string, status: TodoStatus) => {
       setTodos((prev) => {
         const next = prev.map((t) => (t.id === id ? { ...t, status } : t));
         saveLocalTodos(next);
@@ -91,6 +91,51 @@ export function useDiaryData() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, status, deviceId }),
+      });
+    },
+    [deviceId],
+  );
+
+  const updateTodo = useCallback(
+    async (
+      id: string,
+      patch: { title: string; due_date: string | null; status: TodoStatus },
+    ) => {
+      setTodos((prev) => {
+        const next = prev.map((t) => (t.id === id ? { ...t, ...patch } : t));
+        saveLocalTodos(next);
+        return next;
+      });
+
+      await fetch("/api/todos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, deviceId, ...patch }),
+      });
+    },
+    [deviceId],
+  );
+
+  const updateEntry = useCallback(
+    async (
+      id: string,
+      patch: {
+        title: string;
+        content: string;
+        category: EntryCategory;
+        entry_date: string;
+      },
+    ) => {
+      setEntries((prev) => {
+        const next = prev.map((e) => (e.id === id ? { ...e, ...patch } : e));
+        saveLocalEntries(next);
+        return next;
+      });
+
+      await fetch("/api/entries", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, deviceId, ...patch }),
       });
     },
     [deviceId],
@@ -143,6 +188,8 @@ export function useDiaryData() {
     refresh: () => (deviceId ? refresh(deviceId) : Promise.resolve()),
     appendVoiceResult,
     updateTodoStatus,
+    updateTodo,
+    updateEntry,
     deleteEntry,
     deleteTodo,
   };

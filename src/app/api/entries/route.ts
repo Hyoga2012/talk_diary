@@ -29,6 +29,48 @@ export async function GET(request: Request) {
   return NextResponse.json({ entries: data ?? [], storage: "supabase" });
 }
 
+export async function PATCH(request: Request) {
+  const body = (await request.json()) as {
+    id?: string;
+    deviceId?: string;
+    title?: string;
+    content?: string;
+    category?: string;
+    entry_date?: string;
+  };
+
+  if (!body.id) {
+    return NextResponse.json({ error: "잘못된 요청" }, { status: 400 });
+  }
+
+  const updates: Record<string, string> = {};
+  if (typeof body.title === "string") updates.title = body.title.trim();
+  if (typeof body.content === "string") updates.content = body.content.trim();
+  if (typeof body.category === "string") updates.category = body.category;
+  if (typeof body.entry_date === "string") updates.entry_date = body.entry_date;
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: "수정할 내용이 없습니다." }, { status: 400 });
+  }
+
+  const supabase = createServiceClient();
+  if (!supabase) {
+    return NextResponse.json({ ok: true, storage: "local" });
+  }
+
+  let query = supabase.from("entries").update(updates).eq("id", body.id);
+  if (body.deviceId) {
+    query = query.eq("device_id", body.deviceId);
+  }
+
+  const { error } = await query;
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, storage: "supabase" });
+}
+
 export async function DELETE(request: Request) {
   const body = (await request.json()) as {
     id?: string;
