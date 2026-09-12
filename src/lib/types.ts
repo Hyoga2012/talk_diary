@@ -19,8 +19,6 @@ export interface DiaryEntry {
   scheduled_at?: string | null;
   images?: EntryImage[];
   created_at: string;
-  source?: "voice" | "google_calendar" | "google_tasks" | "manual";
-  source_id?: string | null;
 }
 
 export interface TodoItem {
@@ -30,8 +28,6 @@ export interface TodoItem {
   status: TodoStatus;
   due_date?: string | null;
   created_at: string;
-  source?: "voice" | "google_tasks" | "manual";
-  source_id?: string | null;
 }
 
 export interface ClassifiedItem {
