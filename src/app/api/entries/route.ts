@@ -68,6 +68,25 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // 연결된 할일(entry_id)도 제목·마감일 동기화
+  const todoUpdates: Record<string, string | null> = {};
+  if (typeof body.title === "string") todoUpdates.title = body.title.trim();
+  if (typeof body.entry_date === "string") todoUpdates.due_date = body.entry_date;
+
+  if (Object.keys(todoUpdates).length > 0) {
+    let todoQuery = supabase
+      .from("todos")
+      .update(todoUpdates)
+      .eq("entry_id", body.id);
+    if (body.deviceId) {
+      todoQuery = todoQuery.eq("device_id", body.deviceId);
+    }
+    const { error: todoError } = await todoQuery;
+    if (todoError) {
+      console.error(todoError);
+    }
+  }
+
   return NextResponse.json({ ok: true, storage: "supabase" });
 }
 

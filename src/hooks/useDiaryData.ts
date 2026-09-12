@@ -132,6 +132,21 @@ export function useDiaryData() {
         return next;
       });
 
+      // 기록에 연결된 할일 카드도 같이 반영
+      setTodos((prev) => {
+        const next = prev.map((t) =>
+          t.entry_id === id
+            ? {
+                ...t,
+                title: patch.title,
+                due_date: patch.entry_date,
+              }
+            : t,
+        );
+        saveLocalTodos(next);
+        return next;
+      });
+
       await fetch("/api/entries", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
