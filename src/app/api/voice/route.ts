@@ -119,13 +119,15 @@ function buildTodos(
 ): TodoItem[] {
   const todos: TodoItem[] = [];
   classified.forEach((item, index) => {
-    if (!item.is_todo || !item.todo_title) return;
+    if (!item.is_todo) return;
+    const title = (item.todo_title || item.title || "").trim();
+    if (!title) return;
     todos.push({
       id: crypto.randomUUID(),
       entry_id: entries[index]?.id ?? null,
-      title: item.todo_title,
+      title,
       status: "pending",
-      due_date: item.due_date ?? null,
+      due_date: item.due_date ?? item.entry_date ?? null,
       created_at: now,
     });
   });

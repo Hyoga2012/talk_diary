@@ -96,6 +96,45 @@ export function useDiaryData() {
     [deviceId],
   );
 
+  const deleteEntry = useCallback(
+    async (id: string) => {
+      setEntries((prev) => {
+        const next = prev.filter((e) => e.id !== id);
+        saveLocalEntries(next);
+        return next;
+      });
+      setTodos((prev) => {
+        const next = prev.filter((t) => t.entry_id !== id);
+        saveLocalTodos(next);
+        return next;
+      });
+
+      await fetch("/api/entries", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, deviceId }),
+      });
+    },
+    [deviceId],
+  );
+
+  const deleteTodo = useCallback(
+    async (id: string) => {
+      setTodos((prev) => {
+        const next = prev.filter((t) => t.id !== id);
+        saveLocalTodos(next);
+        return next;
+      });
+
+      await fetch("/api/todos", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, deviceId }),
+      });
+    },
+    [deviceId],
+  );
+
   return {
     deviceId,
     entries,
@@ -104,6 +143,8 @@ export function useDiaryData() {
     refresh: () => (deviceId ? refresh(deviceId) : Promise.resolve()),
     appendVoiceResult,
     updateTodoStatus,
+    deleteEntry,
+    deleteTodo,
   };
 }
 
@@ -111,8 +152,10 @@ function mergeById<T extends { id: string }>(primary: T[], secondary: T[]) {
   const map = new Map<string, T>();
   [...secondary, ...primary].forEach((item) => map.set(item.id, item));
   return Array.from(map.values()).sort((a, b) => {
-    const aTime = "created_at" in a ? String((a as { created_at: string }).created_at) : "";
-    const bTime = "created_at" in b ? String((b as { created_at: string }).created_at) : "";
+    const aTime =
+      "created_at" in a ? String((a as { created_at: string }).created_at) : "";
+    const bTime =
+      "created_at" in b ? String((b as { created_at: string }).created_at) : "";
     return bTime.localeCompare(aTime);
   });
 }

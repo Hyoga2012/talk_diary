@@ -7,7 +7,7 @@ import { EntryCard } from "@/components/EntryCard";
 import { useDiaryData } from "@/hooks/useDiaryData";
 
 export default function EntriesPage() {
-  const { entries, ready } = useDiaryData();
+  const { entries, ready, deleteEntry } = useDiaryData();
   const [query, setQuery] = useState("");
 
   const grouped = useMemo(() => {
@@ -66,7 +66,11 @@ export default function EntriesPage() {
               </h2>
               <div className="paper-panel rounded-[1.25rem] px-4">
                 {dayEntries.map((entry) => (
-                  <EntryCard key={entry.id} entry={entry} />
+                  <EntryCard
+                    key={entry.id}
+                    entry={entry}
+                    onDelete={deleteEntry}
+                  />
                 ))}
               </div>
             </section>

@@ -56,3 +56,31 @@ export async function PATCH(request: Request) {
 
   return NextResponse.json({ ok: true, storage: "supabase" });
 }
+
+export async function DELETE(request: Request) {
+  const body = (await request.json()) as {
+    id?: string;
+    deviceId?: string;
+  };
+
+  if (!body.id) {
+    return NextResponse.json({ error: "잘못된 요청" }, { status: 400 });
+  }
+
+  const supabase = createServiceClient();
+  if (!supabase) {
+    return NextResponse.json({ ok: true, storage: "local" });
+  }
+
+  let query = supabase.from("todos").delete().eq("id", body.id);
+  if (body.deviceId) {
+    query = query.eq("device_id", body.deviceId);
+  }
+
+  const { error } = await query;
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, storage: "supabase" });
+}

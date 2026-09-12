@@ -1,5 +1,6 @@
 "use client";
 
+import { Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useDiaryData } from "@/hooks/useDiaryData";
 import type { TodoStatus } from "@/lib/types";
@@ -13,7 +14,7 @@ const filters: Array<TodoStatus | "all"> = [
 ];
 
 export default function TodosPage() {
-  const { todos, ready, updateTodoStatus } = useDiaryData();
+  const { todos, ready, updateTodoStatus, deleteTodo } = useDiaryData();
   const [filter, setFilter] = useState<TodoStatus | "all">("all");
 
   const visible = useMemo(() => {
@@ -34,7 +35,7 @@ export default function TodosPage() {
           할일
         </h1>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          음성에서 자동으로 뽑힌 할일을 여기서 진행 관리합니다
+          일정·생각·아이디어에서 실행할 일을 자동으로 모아 관리합니다
         </p>
       </header>
 
@@ -76,7 +77,7 @@ export default function TodosPage() {
         <p className="text-sm text-[var(--muted)]">불러오는 중...</p>
       ) : visible.length === 0 ? (
         <div className="paper-panel rounded-[1.25rem] px-4 py-10 text-center text-sm text-[var(--muted)]">
-          할일이 없습니다. “내일까지 보고서 보내기”처럼 말해 보세요.
+          할일이 없습니다. “모레 2시까지 ~~ 할거야”처럼 말해 보세요.
         </div>
       ) : (
         <ul className="space-y-3">
@@ -97,15 +98,29 @@ export default function TodosPage() {
                 className="mt-1 h-4 w-4 accent-[var(--accent)]"
               />
               <div className="min-w-0 flex-1">
-                <p
-                  className={`text-sm leading-relaxed ${
-                    todo.status === "done"
-                      ? "text-[var(--muted)] line-through"
-                      : "text-[var(--ink)]"
-                  }`}
-                >
-                  {todo.title}
-                </p>
+                <div className="flex items-start gap-2">
+                  <p
+                    className={`min-w-0 flex-1 text-sm leading-relaxed ${
+                      todo.status === "done"
+                        ? "text-[var(--muted)] line-through"
+                        : "text-[var(--ink)]"
+                    }`}
+                  >
+                    {todo.title}
+                  </p>
+                  <button
+                    type="button"
+                    aria-label="할일 삭제"
+                    onClick={() => {
+                      if (confirm("이 할일을 삭제할까요?")) {
+                        void deleteTodo(todo.id);
+                      }
+                    }}
+                    className="rounded-full p-1.5 text-[var(--muted)] transition hover:bg-[var(--chip-todo)] hover:text-[var(--accent)]"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {(
                     ["pending", "in_progress", "done"] as TodoStatus[]

@@ -15,6 +15,7 @@ export default function HomePage() {
     entries,
     ready,
     appendVoiceResult,
+    deleteEntry,
   } = useDiaryData();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [message, setMessage] = useState<string | null>(null);
@@ -66,12 +67,17 @@ export default function HomePage() {
                   storage: payload.storage,
                 });
                 const saved = payload.entries as DiaryEntry[];
+                const savedTodos = payload.todos as TodoItem[];
                 const count = saved.length;
                 const dates = Array.from(
                   new Set(saved.map((e) => e.entry_date)),
                 ).join(", ");
+                const todoPart =
+                  savedTodos.length > 0
+                    ? ` · 할일 ${savedTodos.length}개 추가`
+                    : "";
                 setMessage(
-                  `${count}개의 기록이 저장됐어요 (${dates})${
+                  `${count}개의 기록이 저장됐어요 (${dates})${todoPart}${
                     payload.storage === "supabase" ? " · 클라우드" : " · 이 기기"
                   }`,
                 );
@@ -129,7 +135,13 @@ export default function HomePage() {
               이 날짜의 기록이 아직 없어요
             </p>
           ) : (
-            dayEntries.map((entry) => <EntryCard key={entry.id} entry={entry} />)
+            dayEntries.map((entry) => (
+              <EntryCard
+                key={entry.id}
+                entry={entry}
+                onDelete={deleteEntry}
+              />
+            ))
           )}
         </div>
       </section>
