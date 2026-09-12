@@ -49,7 +49,7 @@ export const CATEGORY_LABELS: Record<EntryCategory, string> = {
   schedule: "일정",
   thought: "생각",
   idea: "아이디어",
-  note: "기록",
+  note: "메모",
   todo: "할일",
 };
 

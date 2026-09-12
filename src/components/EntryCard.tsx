@@ -8,12 +8,14 @@ import {
   Loader2,
   Mic,
   Pencil,
+  Share2,
   Square,
   Trash2,
   X,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { compressImageFile } from "@/lib/image";
+import { shareDiaryEntry } from "@/lib/share";
 import type { DiaryEntry, EntryCategory, EntryImage } from "@/lib/types";
 import { CATEGORY_LABELS } from "@/lib/types";
 
@@ -60,11 +62,12 @@ export function EntryCard({
   const [category, setCategory] = useState<EntryCategory>(entry.category);
   const [entryDate, setEntryDate] = useState(entry.entry_date);
   const [saving, setSaving] = useState(false);
-  const [busy, setBusy] = useState<"photo" | "voice" | null>(null);
+  const [busy, setBusy] = useState<"photo" | "voice" | "share" | null>(null);
   const [voiceStatus, setVoiceStatus] = useState<"idle" | "recording" | "processing">(
     "idle",
   );
   const [localError, setLocalError] = useState<string | null>(null);
+  const [shareHint, setShareHint] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -217,6 +220,20 @@ export function EntryCard({
     void startAppendVoice();
   };
 
+  const handleShare = async () => {
+    setBusy("share");
+    setShareHint(null);
+    setLocalError(null);
+    try {
+      const hint = await shareDiaryEntry(entry);
+      if (hint) setShareHint(hint);
+    } catch {
+      setLocalError("공유에 실패했습니다.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
     <article className="entry-row border-b border-[var(--line)] py-4 last:border-b-0">
       {!editing ? (
@@ -232,6 +249,19 @@ export function EntryCard({
               {format(parseISO(entry.created_at), "a h:mm", { locale: ko })}
             </time>
             <div className="ml-auto flex items-center gap-0.5">
+              <button
+                type="button"
+                aria-label="기록 공유"
+                disabled={busy === "share"}
+                onClick={() => void handleShare()}
+                className="rounded-full p-1.5 text-[var(--muted)] transition hover:bg-black/5 hover:text-[var(--ink)] disabled:opacity-50"
+              >
+                {busy === "share" ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Share2 size={16} />
+                )}
+              </button>
               {onUpdate && (
                 <button
                   type="button"
@@ -344,6 +374,9 @@ export function EntryCard({
           </div>
           {localError && (
             <p className="mt-2 text-xs text-[var(--accent)]">{localError}</p>
+          )}
+          {shareHint && (
+            <p className="mt-2 text-xs text-[var(--muted)]">{shareHint}</p>
           )}
           <p className="mt-2 text-[11px] text-[var(--muted)]">
             오타는 연필(수정)로 타이핑해 고칠 수 있습니다.
