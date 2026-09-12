@@ -5,7 +5,6 @@ import { ko } from "date-fns/locale";
 import { useMemo, useState } from "react";
 import { DiaryCalendar } from "@/components/DiaryCalendar";
 import { EntryCard } from "@/components/EntryCard";
-import { GoogleSyncPanel } from "@/components/GoogleSyncPanel";
 import { VoiceRecorder } from "@/components/VoiceRecorder";
 import { useDiaryData } from "@/hooks/useDiaryData";
 import type { DiaryEntry, TodoItem } from "@/lib/types";
@@ -24,7 +23,6 @@ export default function HomePage() {
     removeEntryImage,
     appendVoiceToEntry,
     updateTodoStatus,
-    mergeGoogleImport,
   } = useDiaryData();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [message, setMessage] = useState<string | null>(null);
@@ -144,10 +142,6 @@ export default function HomePage() {
           markedDates={markedDates}
         />
       </section>
-
-      {ready && deviceId ? (
-        <GoogleSyncPanel deviceId={deviceId} onImported={mergeGoogleImport} />
-      ) : null}
 
       <section>
         <div className="mb-3 flex items-end justify-between">

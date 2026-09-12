@@ -269,43 +269,6 @@ export function useDiaryData() {
     [],
   );
 
-  const mergeGoogleImport = useCallback(
-    (payload: { entries: DiaryEntry[]; todos: TodoItem[] }) => {
-      setEntries((prev) => {
-        const markers = new Set(
-          prev.map((e) => e.raw_transcript).filter(Boolean) as string[],
-        );
-        const sourceIds = new Set(
-          prev.map((e) => e.source_id).filter(Boolean) as string[],
-        );
-        const fresh = payload.entries.filter((e) => {
-          if (e.raw_transcript && markers.has(e.raw_transcript)) return false;
-          if (e.source_id && sourceIds.has(e.source_id)) return false;
-          return true;
-        });
-        const next = [...fresh, ...prev];
-        saveLocalEntries(next);
-        return next;
-      });
-
-      setTodos((prev) => {
-        const sourceIds = new Set(
-          prev.map((t) => t.source_id).filter(Boolean) as string[],
-        );
-        const titles = new Set(prev.map((t) => t.title));
-        const fresh = payload.todos.filter((t) => {
-          if (t.source_id && sourceIds.has(t.source_id)) return false;
-          if (titles.has(t.title)) return false;
-          return true;
-        });
-        const next = [...fresh, ...prev];
-        saveLocalTodos(next);
-        return next;
-      });
-    },
-    [],
-  );
-
   return {
     deviceId,
     entries,
@@ -321,7 +284,6 @@ export function useDiaryData() {
     addEntryImage,
     removeEntryImage,
     appendVoiceToEntry,
-    mergeGoogleImport,
   };
 }
 
