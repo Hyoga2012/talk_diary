@@ -7,20 +7,20 @@ import { EntryCard } from "@/components/EntryCard";
 import { useDiaryData } from "@/hooks/useDiaryData";
 import type { DiaryEntry } from "@/lib/types";
 
-type RecordTab = "date" | "todo" | "idea" | "memo";
+type RecordTab = "date" | "schedule" | "idea" | "memo";
 
 const TABS: Array<{ id: RecordTab; label: string }> = [
   { id: "date", label: "날짜" },
-  { id: "todo", label: "할일" },
+  { id: "schedule", label: "일정" },
   { id: "idea", label: "아이디어" },
   { id: "memo", label: "메모" },
 ];
 
 function matchesTab(entry: DiaryEntry, tab: RecordTab) {
-  if (tab === "date") return entry.category === "schedule";
-  if (tab === "todo") return entry.category === "todo";
+  if (tab === "date") return true; // 모든 기록
+  if (tab === "schedule") return entry.category === "schedule";
   if (tab === "idea") return entry.category === "idea";
-  // 메모: 생각 + 일반 기록
+  // 메모: 생각 + 메모(note). 할일(todo)은 날짜 탭에서만 함께 보임
   return entry.category === "note" || entry.category === "thought";
 }
 
@@ -66,8 +66,8 @@ export default function EntriesPage() {
   }, [filtered]);
 
   const emptyHint: Record<RecordTab, string> = {
-    date: "일정(날짜) 기록이 없습니다. “내일 회의”처럼 말해 보세요.",
-    todo: "할일 기록이 없습니다. “장보기 해야 해”처럼 말해 보세요.",
+    date: "아직 기록이 없습니다. 홈에서 음성으로 남겨 보세요.",
+    schedule: "일정 기록이 없습니다. “내일 오후 3시 회의”처럼 말해 보세요.",
     idea: "아이디어 기록이 없습니다. “앱 아이디어가 떠올랐어”처럼 말해 보세요.",
     memo: "메모·생각 기록이 없습니다. 자유롭게 말해 보세요.",
   };
@@ -79,8 +79,7 @@ export default function EntriesPage() {
           기록
         </h1>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          음성으로 분류된 카드를 탭별로 보고, 공유 버튼으로 사진과 함께 보낼 수
-          있습니다.
+          날짜는 전체 기록, 일정·아이디어·메모는 분류별로 모읍니다.
         </p>
       </header>
 
